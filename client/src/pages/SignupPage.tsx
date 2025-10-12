@@ -3,17 +3,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SignupPage({ onSignup, onSwitchToLogin }: { onSignup?: () => void; onSwitchToLogin?: () => void }) {
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { signUp } = useAuth();
+  const { toast } = useToast();
 
-  const handleSignup = () => {
-    console.log("Signup triggered", { email, password });
-    onSignup?.();
+  const handleSignup = async () => {
+    if (!email || !username || !password || !confirmPassword) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Password mismatch",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await signUp(email, password, username);
+    setLoading(false);
+
+    if (error) {
+      toast({
+        title: "Signup failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success!",
+        description: "Account created successfully",
+      });
+      onSignup?.();
+    }
   };
 
   return (
@@ -33,6 +72,17 @@ export default function SignupPage({ onSignup, onSwitchToLogin }: { onSignup?: (
           <CardDescription>Start your journey together</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              type="text"
+              placeholder="your_username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              data-testid="input-username"
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -69,9 +119,17 @@ export default function SignupPage({ onSignup, onSwitchToLogin }: { onSignup?: (
           <Button 
             className="w-full rounded-full" 
             onClick={handleSignup}
+            disabled={loading}
             data-testid="button-signup"
           >
-            Sign Up
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              "Sign Up"
+            )}
           </Button>
           <div className="text-center text-sm">
             <span className="text-muted-foreground">Already have an account? </span>

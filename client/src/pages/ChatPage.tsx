@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,13 +14,9 @@ import {
   BarChart3
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-type Message = {
-  id: string;
-  text: string;
-  sender: "me" | "partner";
-  timestamp: Date;
-};
+import { useAuth } from "@/hooks/useAuth";
+import { useSpace } from "@/hooks/useSpace";
+import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 
 export default function ChatPage({ 
   isWinner, 
@@ -37,24 +33,24 @@ export default function ChatPage({
   onShowMusic?: () => void;
   onShowVideo?: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "1", text: "Hey! 💕", sender: "partner", timestamp: new Date() },
-    { id: "2", text: "Hi babe! How are you?", sender: "me", timestamp: new Date() },
-  ]);
+  const { user } = useAuth();
+  const { space } = useSpace(user?.id ?? null);
+  const { messages, loading, sendMessage } = useRealtimeMessages(space?.id ?? null);
   const [newMessage, setNewMessage] = useState("");
 
-  const handleSend = () => {
-    if (!newMessage.trim()) return;
+  useEffect(() => {
+    // Scroll to bottom on new messages
+    const messagesContainer = document.getElementById('messages-container');
+    if (messagesContainer) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !user || !space) return;
     
-    const message: Message = {
-      id: Date.now().toString(),
-      text: newMessage,
-      sender: "me",
-      timestamp: new Date(),
-    };
-    setMessages([...messages, message]);
+    await sendMessage(newMessage, user.id);
     setNewMessage("");
-    console.log("Message sent:", message);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -79,7 +75,9 @@ export default function ChatPage({
             </Avatar>
           </div>
           <div>
-            <h2 className="font-semibold" data-testid="text-couple-name">Waiting for partner to join...</h2>
+            <h2 className="font-semibold" data-testid="text-couple-name">
+              {space?.name || "Loading..."}
+            </h2>
             <p className="text-xs text-muted-foreground">Online</p>
           </div>
         </div>
@@ -106,24 +104,37 @@ export default function ChatPage({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === "me" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[75%] rounded-3xl px-4 py-2 ${
-                message.sender === "me"
-                  ? "bg-primary text-primary-foreground rounded-br-md"
-                  : "bg-card text-card-foreground rounded-bl-md"
-              }`}
-              data-testid={`message-${message.id}`}
-            >
-              {message.text}
-            </div>
+      <div id="messages-container" className="flex-1 overflow-y-auto p-4 space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Loading messages...</p>
           </div>
-        ))}
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">No messages yet. Say hi! 👋</p>
+          </div>
+        ) : (
+          messages.map((message) => {
+            const isMe = message.sender_id === user?.id;
+            return (
+              <div
+                key={message.id}
+                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[75%] rounded-3xl px-4 py-2 ${
+                    isMe
+                      ? "bg-primary text-primary-foreground rounded-br-md"
+                      : "bg-card text-card-foreground rounded-bl-md"
+                  }`}
+                  data-testid={`message-${message.id}`}
+                >
+                  {message.content}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="border-t bg-card">

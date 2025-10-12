@@ -1,33 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trophy, X } from "lucide-react";
-
-type Couple = {
-  id: string;
-  name1: string;
-  name2: string;
-  avatar1: string;
-  avatar2: string;
-  points: number;
-  rank: number;
-};
+import { useRealtimeRankings } from "@/hooks/useRealtimeRankings";
 
 export default function RankingPage({ onClose, prizeAmount }: { onClose?: () => void; prizeAmount?: number }) {
   const [activeTab, setActiveTab] = useState("daily");
-
-  const mockCouples: Couple[] = Array.from({ length: 50 }, (_, i) => ({
-    id: `${i + 1}`,
-    name1: `User ${i * 2 + 1}`,
-    name2: `User ${i * 2 + 2}`,
-    avatar1: "",
-    avatar2: "",
-    points: 1000 - i * 15,
-    rank: i + 1,
-  }));
+  const { rankings, loading } = useRealtimeRankings(activeTab);
 
   const getRankColor = (rank: number) => {
     if (rank === 1) return "text-chart-4";
@@ -73,41 +54,60 @@ export default function RankingPage({ onClose, prizeAmount }: { onClose?: () => 
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4 space-y-3">
-          {mockCouples.map((couple) => (
-            <Card key={couple.id} className={couple.rank <= 3 ? "border-primary/50" : ""}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className={`text-2xl font-display font-bold w-8 text-center ${getRankColor(couple.rank)}`}>
-                  {couple.rank}
-                </div>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading rankings...</p>
+            </div>
+          ) : rankings.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No rankings yet. Start chatting and playing games to earn points!</p>
+            </div>
+          ) : (
+            rankings.map((ranking, index) => {
+              const rank = index + 1;
+              const members = ranking.space?.space_members || [];
+              const member1 = members[0]?.profiles;
+              const member2 = members[1]?.profiles;
 
-                <div className="flex items-center -space-x-2">
-                  <Avatar className="h-10 w-10 border-2 border-background">
-                    <AvatarImage src={couple.avatar1} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {couple.name1[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Avatar className="h-10 w-10 border-2 border-background">
-                    <AvatarImage src={couple.avatar2} />
-                    <AvatarFallback className="bg-chart-2/10 text-chart-2 text-sm">
-                      {couple.name2[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
+              return (
+                <Card key={ranking.id} className={rank <= 3 ? "border-primary/50" : ""}>
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className={`text-2xl font-display font-bold w-8 text-center ${getRankColor(rank)}`}>
+                      {rank}
+                    </div>
 
-                <div className="flex-1">
-                  <p className="font-semibold text-sm" data-testid={`couple-name-${couple.id}`}>
-                    {couple.name1} & {couple.name2}
-                  </p>
-                  <p className="text-xs text-muted-foreground" data-testid={`couple-points-${couple.id}`}>
-                    {couple.points} points
-                  </p>
-                </div>
+                    <div className="flex items-center -space-x-2">
+                      <Avatar className="h-10 w-10 border-2 border-background">
+                        <AvatarImage src={member1?.avatar_url || ""} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                          {member1?.username?.[0] || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      {member2 && (
+                        <Avatar className="h-10 w-10 border-2 border-background">
+                          <AvatarImage src={member2?.avatar_url || ""} />
+                          <AvatarFallback className="bg-chart-2/10 text-chart-2 text-sm">
+                            {member2?.username?.[0] || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
 
-                {getRankBadge(couple.rank)}
-              </CardContent>
-            </Card>
-          ))}
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm" data-testid={`couple-name-${ranking.id}`}>
+                        {ranking.space?.name || "Unknown Space"}
+                      </p>
+                      <p className="text-xs text-muted-foreground" data-testid={`couple-points-${ranking.id}`}>
+                        {ranking.points} points
+                      </p>
+                    </div>
+
+                    {getRankBadge(rank)}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </TabsContent>
       </Tabs>
     </div>

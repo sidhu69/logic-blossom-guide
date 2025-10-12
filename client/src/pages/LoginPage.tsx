@@ -3,16 +3,41 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage({ onLogin, onSwitchToSignup }: { onLogin?: () => void; onSwitchToSignup?: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { signIn } = useAuth();
+  const { toast } = useToast();
 
-  const handleLogin = () => {
-    console.log("Login triggered", { email, password });
-    onLogin?.();
+  const handleLogin = async () => {
+    if (!email || !password) {
+      toast({
+        title: "Missing fields",
+        description: "Please enter both email and password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await signIn(email, password);
+    setLoading(false);
+
+    if (error) {
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      onLogin?.();
+    }
   };
 
   return (
@@ -57,9 +82,17 @@ export default function LoginPage({ onLogin, onSwitchToSignup }: { onLogin?: () 
           <Button 
             className="w-full rounded-full" 
             onClick={handleLogin}
+            disabled={loading}
             data-testid="button-login"
           >
-            Login
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Logging in...
+              </>
+            ) : (
+              "Login"
+            )}
           </Button>
           <div className="text-center text-sm">
             <span className="text-muted-foreground">Don't have an account? </span>
