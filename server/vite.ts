@@ -32,8 +32,8 @@ export async function setupVite(app: Express, server: Server) {
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
+        // Surface Vite errors without killing the process, so we can see logs in preview
         viteLogger.error(msg, options);
-        process.exit(1);
       },
     },
     server: serverOptions,
