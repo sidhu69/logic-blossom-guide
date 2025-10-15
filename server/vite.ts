@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
+// dynamic import of vite.config happens inside setupVite to avoid startup crashes
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -27,8 +27,18 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  const resolvedConfig = await (async () => {
+    try {
+      const mod = await import("../vite.config");
+      return (mod as any).default ?? {};
+    } catch (e) {
+      log(`Failed to import vite.config: ${e instanceof Error ? e.message : String(e)}`, "vite");
+      return {};
+    }
+  })();
+
   const vite = await createViteServer({
-    ...viteConfig,
+    ...resolvedConfig,
     configFile: false,
     customLogger: {
       ...viteLogger,
@@ -40,6 +50,7 @@ export async function setupVite(app: Express, server: Server) {
     server: serverOptions,
     appType: "custom",
   });
+
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {

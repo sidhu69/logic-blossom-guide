@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+// deferred import of routes to catch startup errors
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
@@ -36,9 +36,18 @@ app.use((req, res, next) => {
   next();
 });
 
+// Global error logging to surface startup issues
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] Unhandled Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[server] Uncaught Exception:", err);
+});
+
 (async () => {
   console.log("[server] Booting app...", { NODE_ENV: process.env.NODE_ENV, PORT: process.env.PORT });
   try {
+    const { registerRoutes } = await import("./routes");
     const server = await registerRoutes(app);
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
