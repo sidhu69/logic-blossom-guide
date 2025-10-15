@@ -5,13 +5,30 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
+console.log('🔍 Supabase Environment Check:', {
+  url: SUPABASE_URL || 'MISSING',
+  key: SUPABASE_PUBLISHABLE_KEY ? 'EXISTS' : 'MISSING',
+  allEnvVars: import.meta.env
 });
+
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  const errorMsg = `Missing Supabase credentials: URL=${!!SUPABASE_URL}, KEY=${!!SUPABASE_PUBLISHABLE_KEY}`;
+  console.error('❌', errorMsg);
+  
+  // Create a dummy client to prevent crashes
+  alert('⚠️ Supabase Configuration Error: ' + errorMsg);
+}
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL || 'https://placeholder.supabase.co', 
+  SUPABASE_PUBLISHABLE_KEY || 'placeholder-key',
+  {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    }
+  }
+);
+
+console.log('✅ Supabase client created');
