@@ -61,8 +61,11 @@ process.on("uncaughtException", (err) => {
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
-      console.log("[server] Setting up Vite middlewares...");
-      await setupVite(app, server);
+      console.log("[server] Setting up Vite middlewares asynchronously...");
+      // Do not block server start if Vite fails
+      setupVite(app, server).catch((e) => {
+        console.error("[server] Vite setup failed:", e);
+      });
     } else {
       console.log("[server] Serving static build...");
       serveStatic(app);
