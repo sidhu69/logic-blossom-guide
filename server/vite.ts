@@ -4,8 +4,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-// dynamic import of vite.config happens inside setupVite to avoid startup crashes
 import { nanoid } from "nanoid";
+import react from "@vitejs/plugin-react";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, "..");
 
 const viteLogger = createLogger();
 
@@ -21,66 +25,74 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  log("Setting up Vite with inline config...", "vite");
+  
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
     allowedHosts: true as const,
   };
 
-  const resolvedConfig = await (async () => {
-    try {
-      const mod = await import("../vite.config");
-      return (mod as any).default ?? {};
-    } catch (e) {
-      log(`Failed to import vite.config: ${e instanceof Error ? e.message : String(e)}`, "vite");
-      return {};
-    }
-  })();
-
-  const vite = await createViteServer({
-    ...resolvedConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        // Surface Vite errors without killing the process, so we can see logs in preview
-        viteLogger.error(msg, options);
+  try {
+    const vite = await createViteServer({
+      configFile: false,
+      plugins: [react()],
+      resolve: {
+        alias: {
+          "@": path.resolve(rootDir, "client", "src"),
+          "@shared": path.resolve(rootDir, "shared"),
+          "@assets": path.resolve(rootDir, "attached_assets"),
+        },
       },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
+      root: path.resolve(rootDir, "client"),
+      build: {
+        outDir: path.resolve(rootDir, "dist/public"),
+        emptyOutDir: true,
+      },
+      customLogger: {
+        ...viteLogger,
+        error: (msg, options) => {
+          // Surface Vite errors without killing the process
+          viteLogger.error(msg, options);
+        },
+      },
+      server: serverOptions,
+      appType: "custom",
+    });
+    
+    log("Vite server created successfully", "vite");
 
 
-  app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
+    app.use(vite.middlewares);
+    app.use("*", async (req, res, next) => {
+      const url = req.originalUrl;
 
-    try {
-      const clientTemplate = path.resolve(
-        path.dirname(fileURLToPath(new URL(import.meta.url))),
-        "..",
-        "client",
-        "index.html",
-      );
+      try {
+        const clientTemplate = path.resolve(rootDir, "client", "index.html");
 
-      // always reload the index.html file from disk incase it changes
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
-    }
-  });
+        // always reload the index.html file from disk incase it changes
+        let template = await fs.promises.readFile(clientTemplate, "utf-8");
+        template = template.replace(
+          `src="/src/main.tsx"`,
+          `src="/src/main.tsx?v=${nanoid()}"`,
+        );
+        const page = await vite.transformIndexHtml(url, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
+    
+    log("Vite middleware setup complete", "vite");
+  } catch (error) {
+    log(`Failed to setup Vite: ${error instanceof Error ? error.message : String(error)}`, "vite");
+    throw error;
+  }
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(path.dirname(fileURLToPath(new URL(import.meta.url))), "public");
+  const distPath = path.resolve(rootDir, "dist/public");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
